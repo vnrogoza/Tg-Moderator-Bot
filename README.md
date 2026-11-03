@@ -1,11 +1,81 @@
-<div align="center">
+# 🤖 Telegram AI Модератор чатов (Python + Gemini AI)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Умный робот-модератор для чатов Telegram, полностью переписанный на **Python** (FastAPI, google-genai, TeleBot / aiohttp) с сохранением веб-панели управления и симулятора чата.
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## ⚡ Особенности и возможности:
+- **Нейросеть Google Gemini 3.8**: объективный анализ контекста каждого сообщения, определение скрытого сарказма, троллинга, токсичности и конструктива.
+- **Шкала оценки от -5 до +5**: точная оценка вклада каждого сообщения в атмосферу чата.
+- **Фильтрация мата и обсценной лексики**: встроенный высокоскоростной детектор русского мата и эвфемизмов с мгновенным удалением нарушений.
+- **Персональная карма**: автоматический учет рейтинга пользователей в реальном времени.
+- **Авто-мут и авто-бан**:
+  - Накопление рейтинга $\le -10$: автоматический временный мут (по умолчанию на 2 часа).
+  - Накопление рейтинга $\le -25$: перманентная блокировка пользователя.
+- **Режимы работы**:
+  1. **Веб-панель и интерактивный симулятор**: живое тестирование фраз, база участников, аналитика, панель настроек.
+  2. **Реальный Telegram-бот**: подключение к любой группе через токен из [@BotFather](https://t.me/BotFather) (Long Polling или Webhook).
+  3. **Автономный консольный скрипт (`bot.py`)**: запуск чистого Telegram-бота без веб-сервера.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+---
 
-</div>
+## 🚀 Быстрый запуск
+
+### 1. Установка зависимостей
+```bash
+# Установка Python-зависимостей
+pip install -r requirements.txt
+
+# Установка зависимостей интерфейса
+npm install
+```
+
+### 2. Настройка переменных окружения (`.env`)
+Создайте файл `.env`:
+```env
+PORT=3000
+GEMINI_API_KEY="ваш_ключ_google_gemini"
+TELEGRAM_BOT_TOKEN="ваш_токен_из_botfather"
+```
+
+### 3. Запуск веб-панели с сервером на Python:
+```bash
+# Сборка интерфейса
+npm run build
+
+# Запуск сервера на Python (FastAPI на порту 3000)
+python3 server.py
+# или
+npm start
+```
+Откройте в браузере: `http://localhost:3000`
+
+### 4. Запуск автономного Telegram-бота (без веб-интерфейса):
+```bash
+python3 bot.py
+```
+
+---
+
+## 🐳 Запуск через Docker
+
+```bash
+docker build -t telegram-moderator-python .
+docker run -d -p 3000:3000 \
+  -e GEMINI_API_KEY="ваш_ключ" \
+  -e TELEGRAM_BOT_TOKEN="ваш_токен" \
+  --name tg-moderator telegram-moderator-python
+```
+
+---
+
+## 📁 Структура проекта (Python):
+
+- `server.py` — главный асинхронный FastAPI веб-сервер (REST API, статика, SPA fallback).
+- `backend/` — модули логики на Python:
+  - `backend/gemini_moderator.py` — интеграция с Google GenAI SDK (Gemini 3.8) + локальный анализатор русского мата и тональности.
+  - `backend/store.py` — хранилище данных, расчет кармы, статусов (мут/бан), история нарушений, статистика.
+  - `backend/telegram_bot.py` — сервис Telegram Bot API (Long Polling, Webhook, команды `/rating`, `/stats`, `/unban`, муты и баны).
+- `bot.py` — отдельный скрипт автономного Telegram-бота (pyTelegramBotAPI).
+- `requirements.txt` — список Python-пакетов (`fastapi`, `uvicorn`, `google-genai`, `requests`, `aiohttp`, `pyTelegramBotAPI`, `python-dotenv`).
+- `src/` — React + Tailwind административная панель (симулятор диалогов, карточки пользователей, графики, настройки).
