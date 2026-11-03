@@ -1,0 +1,6 @@
+{
+  "summary": "Comprehensive implementation plan to convert the Telegram Chatbot Moderator into a pure Python architecture: eliminating redundant TypeScript server code and folder duplicates, unifying backend modules under backend/, adding SQLite karma persistence, and ensuring seamless web dashboard and Telegram bot operation.",
+  "updatedAt": "2026-11-03T18:34:33.800947859Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

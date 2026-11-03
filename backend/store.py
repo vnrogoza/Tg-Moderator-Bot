@@ -1,11 +1,22 @@
+import os
+import sys
 import time
+import json
+import sqlite3
 import random
 import string
+import threading
+from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT_DIR / "moderator.db"
 
 
 class ChatModerationStore:
-    def __init__(self):
+    def __init__(self, db_path: Path = DB_PATH):
+        self.db_path = db_path
+        self.lock = threading.Lock()
         self.users: Dict[str, Dict[str, Any]] = {}
         self.messages: List[Dict[str, Any]] = []
         self.settings: Dict[str, Any] = {
@@ -18,9 +29,184 @@ class ChatModerationStore:
             "realTelegramConnected": False,
             "telegramBotUsername": "ModAIBot",
         }
-        self.seed_initial_data()
+        self._init_db()
+        self._load_from_db()
 
-    def seed_initial_data(self):
+    def _get_connection(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self):
+        with self.lock:
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT,
+                    fullName TEXT,
+                    avatarUrl TEXT,
+                    rating INTEGER DEFAULT 0,
+                    totalMessages INTEGER DEFAULT 0,
+                    toxicMessages INTEGER DEFAULT 0,
+                    profanityMessages INTEGER DEFAULT 0,
+                    positiveMessages INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'active',
+                    mutedUntil INTEGER,
+                    lastActivity INTEGER,
+                    riskLevel TEXT DEFAULT 'low',
+                    chatId TEXT,
+                    history TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT PRIMARY KEY,
+                    userId TEXT,
+                    userJson TEXT,
+                    text TEXT,
+                    timestamp INTEGER,
+                    moderationJson TEXT,
+                    isDeleted INTEGER DEFAULT 0,
+                    botReply TEXT
+                )
+            """)
+            conn.commit()
+            conn.close()
+
+    def _load_from_db(self):
+        with self.lock:
+            conn = self._get_connection()
+            cur = conn.cursor()
+
+            # Load settings
+            cur.execute("SELECT key, value FROM settings")
+            rows = cur.fetchall()
+            for r in rows:
+                try:
+                    self.settings[r["key"]] = json.loads(r["value"])
+                except Exception:
+                    self.settings[r["key"]] = r["value"]
+
+            # Load users
+            cur.execute("SELECT * FROM users")
+            user_rows = cur.fetchall()
+
+            if not user_rows:
+                # Seed initial demo data
+                conn.close()
+                self._seed_initial_data()
+                return
+
+            self.users = {}
+            for r in user_rows:
+                u = dict(r)
+                u["history"] = json.loads(u.get("history") or "[]")
+                self.users[u["id"]] = u
+
+            # Load recent messages
+            cur.execute("SELECT * FROM messages ORDER BY timestamp ASC LIMIT 100")
+            msg_rows = cur.fetchall()
+            self.messages = []
+            for r in msg_rows:
+                m = {
+                    "id": r["id"],
+                    "userId": r["userId"],
+                    "user": json.loads(r["userJson"] or "{}"),
+                    "text": r["text"],
+                    "timestamp": r["timestamp"],
+                    "moderation": json.loads(r["moderationJson"] or "{}"),
+                    "isDeleted": bool(r["isDeleted"]),
+                    "botReply": r["botReply"],
+                }
+                self.messages.append(m)
+
+            conn.close()
+
+    def _persist_user(self, user: Dict[str, Any]):
+        conn = self._get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO users (
+                id, username, fullName, avatarUrl, rating, totalMessages,
+                toxicMessages, profanityMessages, positiveMessages, status,
+                mutedUntil, lastActivity, riskLevel, chatId, history
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                username=excluded.username,
+                fullName=excluded.fullName,
+                avatarUrl=excluded.avatarUrl,
+                rating=excluded.rating,
+                totalMessages=excluded.totalMessages,
+                toxicMessages=excluded.toxicMessages,
+                profanityMessages=excluded.profanityMessages,
+                positiveMessages=excluded.positiveMessages,
+                status=excluded.status,
+                mutedUntil=excluded.mutedUntil,
+                lastActivity=excluded.lastActivity,
+                riskLevel=excluded.riskLevel,
+                chatId=excluded.chatId,
+                history=excluded.history
+        """, (
+            str(user["id"]),
+            user.get("username"),
+            user.get("fullName"),
+            user.get("avatarUrl"),
+            user.get("rating", 0),
+            user.get("totalMessages", 0),
+            user.get("toxicMessages", 0),
+            user.get("profanityMessages", 0),
+            user.get("positiveMessages", 0),
+            user.get("status", "active"),
+            user.get("mutedUntil"),
+            user.get("lastActivity", int(time.time() * 1000)),
+            user.get("riskLevel", "low"),
+            str(user.get("chatId", "")) if user.get("chatId") is not None else None,
+            json.dumps(user.get("history", []), ensure_ascii=False),
+        ))
+        conn.commit()
+        conn.close()
+
+    def _persist_message(self, msg: Dict[str, Any]):
+        conn = self._get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO messages (
+                id, userId, userJson, text, timestamp, moderationJson, isDeleted, botReply
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            msg["id"],
+            str(msg.get("userId", "")),
+            json.dumps(msg.get("user", {}), ensure_ascii=False),
+            msg.get("text", ""),
+            msg.get("timestamp", int(time.time() * 1000)),
+            json.dumps(msg.get("moderation", {}), ensure_ascii=False),
+            1 if msg.get("isDeleted") else 0,
+            msg.get("botReply"),
+        ))
+        conn.commit()
+        conn.close()
+
+    def _persist_settings(self):
+        conn = self._get_connection()
+        cur = conn.cursor()
+        for k, v in self.settings.items():
+            val = json.dumps(v, ensure_ascii=False)
+            cur.execute("""
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """, (k, val))
+        conn.commit()
+        conn.close()
+
+    def _seed_initial_data(self):
         now = int(time.time() * 1000)
 
         initial_users = [
@@ -147,8 +333,9 @@ class ChatModerationStore:
 
         for u in initial_users:
             self.users[u["id"]] = u
+            self._persist_user(u)
 
-        self.messages = [
+        initial_messages = [
             {
                 "id": "msg_1",
                 "userId": "user_101",
@@ -250,11 +437,18 @@ class ChatModerationStore:
             },
         ]
 
+        self.messages = initial_messages
+        for m in initial_messages:
+            self._persist_message(m)
+
+        self._persist_settings()
+
     def get_settings(self) -> Dict[str, Any]:
         return dict(self.settings)
 
     def update_settings(self, partial: Dict[str, Any]) -> Dict[str, Any]:
         self.settings.update(partial)
+        self._persist_settings()
         return dict(self.settings)
 
     def recalc_risk_level(self, user: Dict[str, Any]):
@@ -277,12 +471,15 @@ class ChatModerationStore:
         now = int(time.time() * 1000)
         mute_th = self.settings["muteThreshold"]
 
+        changed = False
         for u in self.users.values():
             if u.get("status") == "muted" and u.get("mutedUntil") and now > u["mutedUntil"]:
                 u["status"] = "active"
                 u.pop("mutedUntil", None)
                 if u.get("rating", 0) <= mute_th or u.get("rating", 0) < 0:
                     u["rating"] = 0
+                self._persist_user(u)
+                changed = True
             self.recalc_risk_level(u)
 
         return sorted(self.users.values(), key=lambda x: x.get("rating", 0), reverse=True)
@@ -301,6 +498,7 @@ class ChatModerationStore:
                 if user.get("rating", 0) <= self.settings["muteThreshold"] or user.get("rating", 0) < 0:
                     user["rating"] = 0
                 self.recalc_risk_level(user)
+                self._persist_user(user)
         return user
 
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
@@ -334,18 +532,26 @@ class ChatModerationStore:
                 "lastActivity": int(time.time() * 1000),
                 "riskLevel": "low",
                 "history": [],
-                "chatId": chat_id,
+                "chatId": str(chat_id) if chat_id is not None else None,
             }
             self.users[str(user_id)] = user
+            self._persist_user(user)
         else:
-            if username:
+            updated = False
+            if username and user.get("username") != username:
                 user["username"] = username
-            if full_name:
+                updated = True
+            if full_name and user.get("fullName") != full_name:
                 user["fullName"] = full_name
-            if avatar_url:
+                updated = True
+            if avatar_url and user.get("avatarUrl") != avatar_url:
                 user["avatarUrl"] = avatar_url
-            if chat_id is not None:
-                user["chatId"] = chat_id
+                updated = True
+            if chat_id is not None and user.get("chatId") != str(chat_id):
+                user["chatId"] = str(chat_id)
+                updated = True
+            if updated:
+                self._persist_user(user)
         return user
 
     def process_incoming_message(
@@ -398,6 +604,7 @@ class ChatModerationStore:
                 "botReply": f"🔇 @{user['username']}, вы временно заблокированы в чате. До снятия ограничений: {remaining_mins} мин.",
             }
             self.messages.append(blocked_msg)
+            self._persist_message(blocked_msg)
             return {"message": blocked_msg, "user": user, "autoAction": "blocked_muted"}
 
         # Check currently banned
@@ -424,6 +631,7 @@ class ChatModerationStore:
                 "botReply": f"🚫 @{user['username']} заблокирован навсегда за систематические грубые нарушения.",
             }
             self.messages.append(blocked_msg)
+            self._persist_message(blocked_msg)
             return {"message": blocked_msg, "user": user, "autoAction": "blocked_banned"}
 
         # Apply cumulative rating
@@ -478,6 +686,7 @@ class ChatModerationStore:
             bot_reply = f"⚠️ Предупреждение @{user['username']}: оценка сообщения [{score}/5]. Причина: {moderation.get('explanation', '')}. Текущий рейтинг: {user['rating']}. При достижении {mute_th} включится авто-мут."
 
         self.recalc_risk_level(user)
+        self._persist_user(user)
 
         new_msg = {
             "id": f"msg_{now}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=4))}",
@@ -501,6 +710,7 @@ class ChatModerationStore:
         if len(self.messages) > 100:
             self.messages.pop(0)
 
+        self._persist_message(new_msg)
         return {"message": new_msg, "user": user, "autoAction": auto_action}
 
     def get_messages(self) -> List[Dict[str, Any]]:
@@ -508,6 +718,11 @@ class ChatModerationStore:
 
     def clear_messages(self):
         self.messages = []
+        conn = self._get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM messages")
+        conn.commit()
+        conn.close()
 
     def update_user_status(
         self,
@@ -532,6 +747,7 @@ class ChatModerationStore:
                 user["rating"] = 0
 
         self.recalc_risk_level(user)
+        self._persist_user(user)
         return user
 
     def unblock_user(self, user_id: str, new_rating: int = 0) -> Optional[Dict[str, Any]]:
@@ -543,6 +759,7 @@ class ChatModerationStore:
         user.pop("mutedUntil", None)
         user["rating"] = max(0, new_rating)
         self.recalc_risk_level(user)
+        self._persist_user(user)
         return user
 
     def reset_user_rating(self, user_id: str, new_rating: int = 0) -> Optional[Dict[str, Any]]:
@@ -553,6 +770,7 @@ class ChatModerationStore:
         user["status"] = "active"
         user.pop("mutedUntil", None)
         self.recalc_risk_level(user)
+        self._persist_user(user)
         return user
 
     def get_stats(self) -> Dict[str, Any]:

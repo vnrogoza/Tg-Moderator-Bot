@@ -123,6 +123,12 @@ def fallback_rule_analysis(text: str) -> Dict[str, Any]:
 
 def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] = None) -> Dict[str, Any]:
     fallback = fallback_rule_analysis(text)
+
+    # Fast-path: If blatant profanity or extreme aggression is detected locally,
+    # penalize immediately without spending Gemini API quota
+    if fallback.get("profanityDetected") and fallback.get("score", 0) <= -4:
+        return fallback
+
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:

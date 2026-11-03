@@ -297,6 +297,15 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_python_server(host="0.0.0.0", port=3000):
+    dist_dir = ROOT_DIR / "dist"
+    if not (dist_dir / "index.html").is_file():
+        print("dist/ not found, building frontend assets...")
+        try:
+            import subprocess
+            subprocess.run(["npx", "vite", "build"], cwd=str(ROOT_DIR), check=True)
+        except Exception as e:
+            print(f"Warning building frontend: {e}")
+
     server_address = (host, port)
     httpd = ThreadedHTTPServer(server_address, ModeratorRequestHandler)
     print(f"🚀 Telegram Chat Moderator Server (Pure Python) running on http://{host}:{port}")
