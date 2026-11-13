@@ -11,10 +11,15 @@ import json
 import time
 import argparse
 import mimetypes
+import subprocess
+import threading
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from socketserver import ThreadingMixIn
+
+_frontend_build_done = threading.Event()
+_frontend_build_done.set()
 
 # Add root directory to sys.path
 ROOT_DIR = Path(__file__).resolve().parent
@@ -38,6 +43,7 @@ from backend.telegram_bot import telegram_service
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
+    allow_reuse_address = True
 
 
 class ModeratorRequestHandler(BaseHTTPRequestHandler):
@@ -193,8 +199,15 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
             chat_id = user.get("chatId") if user else None
 
             if action == "mute":
-                updated = store.update_user_status(uid, "muted", duration)
-                until_unix = int(time.time()) + (duration or 60) * 60
+                is_permanent = (duration == 0)
+                if is_permanent:
+                    updated = store.update_user_status(uid, "muted", duration_minutes=0)
+                    until_unix = 0
+                else:
+                    dur = duration if (duration is not None and duration > 0) else 60
+                    updated = store.update_user_status(uid, "muted", duration_minutes=dur)
+                    until_unix = int(time.time()) + dur * 60
+
                 target_chats = [chat_id] if chat_id else telegram_service.get_known_chat_ids()
                 for c_id in target_chats:
                     telegram_service.restrict_member_sync(c_id, uid, until_unix)
@@ -259,6 +272,9 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
 
     def serve_static_or_spa(self, rel_path):
         dist_dir = ROOT_DIR / "dist"
+        if not (dist_dir / "index.html").is_file() and not _frontend_build_done.is_set():
+            _frontend_build_done.wait(timeout=25)
+
         clean_path = rel_path.lstrip("/")
         target_file = dist_dir / clean_path
 
@@ -296,33 +312,47 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def run_python_server(host="0.0.0.0", port=3000):
-    dist_dir = ROOT_DIR / "dist"
-    if not (dist_dir / "index.html").is_file():
-        print("dist/ not found, building frontend assets...")
-        try:
-            import subprocess
-            subprocess.run(["npx", "vite", "build"], cwd=str(ROOT_DIR), check=True)
-        except Exception as e:
-            print(f"Warning building frontend: {e}")
+def _build_frontend_bg():
+    try:
+        vite_bin = ROOT_DIR / "node_modules" / ".bin" / "vite"
+        cmd = [str(vite_bin), "build"] if vite_bin.is_file() else ["npx", "vite", "build"]
+        subprocess.run(cmd, cwd=str(ROOT_DIR), check=True)
+    except Exception as e:
+        print(f"Warning building frontend: {e}", flush=True)
+    finally:
+        _frontend_build_done.set()
 
+
+def _init_telegram_bg():
+    try:
+        token = telegram_service.get_token()
+        if token:
+            res = telegram_service.init_bot()
+            if res.get("success"):
+                print(f"✅ Telegram bot connected: @{res.get('botName')}", flush=True)
+                if os.getenv("TELEGRAM_POLLING_ENABLED") != "false":
+                    telegram_service.start_polling_thread()
+    except Exception as e:
+        print(f"Warning initializing Telegram bot: {e}", flush=True)
+
+
+def run_python_server(host="0.0.0.0", port=3000):
     server_address = (host, port)
     httpd = ThreadedHTTPServer(server_address, ModeratorRequestHandler)
-    print(f"🚀 Telegram Chat Moderator Server (Pure Python) running on http://{host}:{port}")
+    print(f"🚀 Telegram Chat Moderator Server (Pure Python) running on http://{host}:{port}", flush=True)
 
-    # Check and initialize bot if token exists
-    token = telegram_service.get_token()
-    if token:
-        res = telegram_service.init_bot()
-        if res.get("success"):
-            print(f"✅ Telegram bot connected: @{res.get('botName')}")
-            if os.getenv("TELEGRAM_POLLING_ENABLED") != "false":
-                telegram_service.start_polling_thread()
+    dist_dir = ROOT_DIR / "dist"
+    if not (dist_dir / "index.html").is_file():
+        print("dist/ not found, building frontend assets in background...", flush=True)
+        _frontend_build_done.clear()
+        threading.Thread(target=_build_frontend_bg, daemon=True).start()
+
+    threading.Thread(target=_init_telegram_bg, daemon=True).start()
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping Python server...")
+        print("\nStopping Python server...", flush=True)
         httpd.server_close()
 
 

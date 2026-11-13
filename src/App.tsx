@@ -115,7 +115,7 @@ export default function App() {
       } else if (data.autoAction === 'banned') {
         setAlertBanner({
           title: 'Перманентный Бан!',
-          message: `Пользователь @${data.user.username} заблокирован навсегда за критические нарушения.`,
+          message: `Пользователь @${data.user.username} исключён и заблокирован в чате за критические нарушения.`,
           type: 'warning',
         });
         setTimeout(() => setAlertBanner(null), 6000);
@@ -145,7 +145,7 @@ export default function App() {
 
   const handleUserAction = async (
     userId: string,
-    action: 'mute' | 'unmute' | 'ban' | 'reset_rating',
+    action: 'mute' | 'unmute' | 'ban' | 'unban' | 'reset_rating',
     durationMinutes?: number,
     newRating?: number,
     resetRating?: boolean
@@ -161,12 +161,31 @@ export default function App() {
         setUsers((prev) => prev.map((u) => (u.id === userId ? data.user : u)));
         setSelectedUser((prev) => (prev && prev.id === userId ? data.user : prev));
       }
-      if (action === 'unmute' || action === 'reset_rating') {
+      if (action === 'unmute' || action === 'unban' || action === 'reset_rating') {
         const name = data.user?.username || userId;
         setAlertBanner({
-          title: 'Пользователь разблокирован',
-          message: `Ограничения с @${name} сняты, статус активен, карма сброшена до 0.`,
+          title: 'Возможность писать возвращена',
+          message: `Ограничения с @${name} сняты: разрешена отправка сообщений, карма сброшена до 0.`,
           type: 'info',
+        });
+        setTimeout(() => setAlertBanner(null), 5000);
+      } else if (action === 'mute') {
+        const name = data.user?.username || userId;
+        const isPerm = durationMinutes === 0;
+        setAlertBanner({
+          title: isPerm ? 'Постоянный мут' : 'Временный мут',
+          message: isPerm
+            ? `Пользователю @${name} установлен постоянный мут (режим «Только чтение», остаётся в чате).`
+            : `Пользователь @${name} временно заблокирован на ${durationMinutes || 60} мин.`,
+          type: 'warning',
+        });
+        setTimeout(() => setAlertBanner(null), 5000);
+      } else if (action === 'ban') {
+        const name = data.user?.username || userId;
+        setAlertBanner({
+          title: 'Пользователь удалён и забанен',
+          message: `Пользователь @${name} исключён из чата и заблокирован в Telegram.`,
+          type: 'warning',
         });
         setTimeout(() => setAlertBanner(null), 5000);
       }

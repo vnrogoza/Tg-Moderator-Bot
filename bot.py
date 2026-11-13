@@ -117,10 +117,10 @@ def admin_unban(message: types.Message):
         )
         return
 
-    # Unban in Telegram
+    # Unban in Telegram: restore messaging abilities and clear kick status if any
     try:
         if target_id.isdigit():
-            bot.unban_chat_member(message.chat.id, int(target_id), only_if_banned=False)
+            bot.unban_chat_member(message.chat.id, int(target_id), only_if_banned=True)
             bot.restrict_chat_member(
                 message.chat.id,
                 int(target_id),
@@ -138,7 +138,7 @@ def admin_unban(message: types.Message):
     store.update_user_status(target_id, "active", None, True)
     bot.reply_to(
         message,
-        f"✅ Пользователь @{str(target_name).lstrip('@')} разблокирован! Мут снят, рейтинг сброшен до 0.",
+        f"✅ Пользователю @{str(target_name).lstrip('@')} возвращена возможность отправлять сообщения! Ограничения сняты, рейтинг сброшен до 0.",
     )
 
 
@@ -182,7 +182,7 @@ def moderate_incoming_message(message: types.Message):
         except Exception as e:
             logger.warning(f"Не удалось удалить сообщение: {e}")
 
-    # Auto-actions
+    # Auto-actions: настоящий бан и исключение из чата
     if outcome.get("autoAction") == "banned":
         try:
             bot.ban_chat_member(message.chat.id, int(user_id))
@@ -190,7 +190,7 @@ def moderate_incoming_message(message: types.Message):
             logger.warning(f"Ban member error: {e}")
         bot.send_message(
             message.chat.id,
-            f"🚫 <b>@{username} навсегда заблокирован в чате!</b>\nКумулятивный рейтинг упал до {outcome['user']['rating']}.",
+            f"🚫 <b>Пользователь @{username} исключён и заблокирован в чате!</b>\nКумулятивный рейтинг упал до {outcome['user']['rating']}.",
         )
     elif outcome.get("autoAction") == "muted":
         until_unix = int(time.time()) + settings.get("muteDurationMinutes", 120) * 60

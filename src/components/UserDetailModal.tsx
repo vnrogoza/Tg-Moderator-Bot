@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { X, ShieldAlert, ShieldCheck, Clock, UserX, RotateCcw, AlertTriangle, MessageSquare } from 'lucide-react';
 import { UserRecord } from '../types';
 
@@ -6,7 +7,7 @@ interface UserDetailModalProps {
   onClose: () => void;
   onAction: (
     userId: string,
-    action: 'mute' | 'unmute' | 'ban' | 'reset_rating',
+    action: 'mute' | 'unmute' | 'ban' | 'unban' | 'reset_rating',
     durationMinutes?: number,
     newRating?: number,
     resetRating?: boolean
@@ -14,6 +15,8 @@ interface UserDetailModalProps {
 }
 
 export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProps) {
+  const [showBanConfirm, setShowBanConfirm] = useState(false);
+
   if (!user) return null;
 
   const isMuted = user.status === 'muted';
@@ -22,7 +25,7 @@ export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProp
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         id="user-detail-modal"
       >
         {/* Header */}
@@ -52,7 +55,7 @@ export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProp
                 >
                   {user.status === 'active' && 'Активен'}
                   {user.status === 'warned' && 'Предупреждён'}
-                  {user.status === 'muted' && 'Временный мут'}
+                  {user.status === 'muted' && (user.mutedUntil ? 'Временный мут' : 'Постоянный мут')}
                   {user.status === 'banned' && 'Заблокирован (Бан)'}
                 </span>
 
@@ -108,10 +111,10 @@ export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProp
               <button
                 onClick={() => onAction(user.id, 'unmute', undefined, undefined, true)}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm"
-                title="Снять блокировку, мут и восстановить карму"
+                title="Снять блокировку, разрешить вернуться в чат и восстановить карму"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Снять блокировку / Простить
+                Разблокировать / Снять бан
               </button>
             ) : (
               <>
@@ -130,11 +133,12 @@ export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProp
                   Мут 24 часа
                 </button>
                 <button
-                  onClick={() => onAction(user.id, 'ban')}
+                  onClick={() => setShowBanConfirm(true)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                  title="Исключить пользователя из чата и заблокировать в Telegram"
                 >
                   <UserX className="w-3.5 h-3.5" />
-                  Бан навсегда
+                  Удалить пользователя (Бан)
                 </button>
               </>
             )}
@@ -148,6 +152,48 @@ export function UserDetailModal({ user, onClose, onAction }: UserDetailModalProp
             </button>
           </div>
         </div>
+
+        {/* Ban Confirmation Modal Overlay */}
+        {showBanConfirm && (
+          <div className="absolute inset-0 z-30 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-rose-100 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Удалить пользователя?</h4>
+                  <p className="text-xs text-slate-500">Подтверждение блокировки</p>
+                </div>
+              </div>
+
+              <div className="bg-rose-50 border border-rose-200/80 rounded-xl p-3 text-xs text-rose-950 leading-relaxed">
+                Вы уверены, что хотите заблокировать и удалить <span className="font-bold">@{user.username}</span> ({user.fullName}) из чата Telegram? Пользователь будет исключён из группы.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowBanConfirm(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowBanConfirm(false);
+                    await onAction(user.id, 'ban');
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <UserX className="w-3.5 h-3.5" />
+                  Да, удалить (Бан)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Message History */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">

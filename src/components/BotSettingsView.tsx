@@ -229,7 +229,7 @@ export function BotSettingsView({ settings, onUpdateSettings, onTestPhrase }: Bo
                 className="w-full accent-rose-700 cursor-pointer"
               />
               <p className="text-[11px] text-slate-500">
-                Полная блокировка в чате при падении кармы до {formData.banThreshold}.
+                Бессрочный запрет отправки сообщений (режим «Только чтение» без удаления из чата) при падении кармы до {formData.banThreshold}.
               </p>
             </div>
 
@@ -245,6 +245,21 @@ export function BotSettingsView({ settings, onUpdateSettings, onTestPhrase }: Bo
                     className="w-4 h-4 rounded text-indigo-600 accent-indigo-600"
                   />
                   <span>Удалять сообщения с ненормативной лексикой</span>
+                </label>
+
+                <label className="flex items-start gap-2.5 text-xs text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.commentProfanityMessages ?? true}
+                    onChange={(e) => setFormData({ ...formData, commentProfanityMessages: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 accent-indigo-600"
+                  />
+                  <div>
+                    <span className="font-medium">Комментировать сообщения с ненормативной лексикой</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      После удаления матерного сообщения бот выдает краткий комментарий без показа запрещенного слова.
+                    </span>
+                  </div>
                 </label>
 
                 <label className="flex items-start gap-2.5 text-xs text-slate-800 cursor-pointer">

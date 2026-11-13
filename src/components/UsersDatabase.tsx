@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, UserCheck, UserX, Clock, RotateCcw, AlertTriangle, ShieldAlert, ArrowUpDown, ChevronRight, Filter } from 'lucide-react';
+import { Search, UserCheck, Clock, RotateCcw, AlertTriangle, ShieldAlert, ArrowUpDown, ChevronRight, Filter } from 'lucide-react';
 import { UserRecord } from '../types';
 
 interface UsersDatabaseProps {
@@ -7,7 +7,7 @@ interface UsersDatabaseProps {
   onSelectUser: (user: UserRecord) => void;
   onAction: (
     userId: string,
-    action: 'mute' | 'unmute' | 'ban' | 'reset_rating',
+    action: 'mute' | 'unmute' | 'ban' | 'unban' | 'reset_rating',
     durationMinutes?: number,
     newRating?: number,
     resetRating?: boolean
@@ -237,7 +237,7 @@ export function UsersDatabase({ users, onSelectUser, onAction }: UsersDatabasePr
                       >
                         {user.status === 'active' && 'Активен'}
                         {user.status === 'warned' && 'Предупреждён'}
-                        {user.status === 'muted' && 'Временный мут'}
+                        {user.status === 'muted' && (user.mutedUntil ? 'Временный мут' : 'Постоянный мут')}
                         {user.status === 'banned' && 'Бан'}
                       </span>
                     </td>
@@ -291,9 +291,9 @@ export function UsersDatabase({ users, onSelectUser, onAction }: UsersDatabasePr
                           <button
                             onClick={() => onAction(user.id, 'unmute', undefined, undefined, true)}
                             className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
-                            title="Снять блокировку, ограничения и восстановить рейтинг"
+                            title="Снять ограничения и вернуть возможность отправлять сообщения"
                           >
-                            Разблокировать
+                            Разрешить писать
                           </button>
                         ) : (
                           <>
@@ -305,11 +305,11 @@ export function UsersDatabase({ users, onSelectUser, onAction }: UsersDatabasePr
                               <Clock className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => onAction(user.id, 'ban')}
+                              onClick={() => onAction(user.id, 'mute', 0)}
                               className="p-1.5 text-rose-700 hover:bg-rose-100 rounded-lg transition-colors"
-                              title="Бан навсегда"
+                              title='Мут постоянный (режим "Только чтение")'
                             >
-                              <UserX className="w-4 h-4" />
+                              <Clock className="w-4 h-4" />
                             </button>
                           </>
                         )}

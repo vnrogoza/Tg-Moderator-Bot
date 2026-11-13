@@ -65,6 +65,7 @@ export interface BotSettings {
   banThreshold: number; // e.g. -25
   muteDurationMinutes: number; // e.g. 60 min (1 hour)
   autoDeleteProfanity: boolean;
+  commentProfanityMessages: boolean;
   showRatingBadgeUnderAll: boolean;
   commentNeutralMessages: boolean; // false by default: neutral messages are never commented on
   realTelegramConnected: boolean;

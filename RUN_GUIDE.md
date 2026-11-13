@@ -17,7 +17,52 @@
 
 ---
 
-## Вариант 2. Запуск на собственном сервере (VPS / VDS / Ubuntu / Debian)
+## Вариант 2. Запуск в Visual Studio Code (Локально)
+
+### 1. Открытие проекта в VS Code
+1. Откройте VS Code: `Файл` -> `Открыть папку...` (`File` -> `Open Folder...`) и выберите папку проекта.
+2. Убедитесь, что установлены расширения:
+   - **Python** (от Microsoft)
+
+### 2. Создание файла конфигурации `.env`
+Скопируйте пример настроек и укажите ваш API-ключ:
+```bash
+cp .env.example .env
+```
+В файле `.env` укажите:
+```env
+PORT=3000
+GEMINI_API_KEY="ваш_ключ_из_Google_AI_Studio"
+TELEGRAM_BOT_TOKEN="ваш_токен_из_BotFather"
+```
+
+### 3. Установка зависимостей в терминале VS Code (Ctrl + `)
+```bash
+# Установка Python-зависимостей
+pip install -r requirements.txt
+
+# Установка зависимостей веб-интерфейса
+npm install
+
+# Сборка веб-панели
+npm run build
+```
+
+### 4. Запуск в 1 клик (F5):
+В левой панели VS Code перейдите в раздел **«Выполнить и отладка»** (`Ctrl+Shift+D` / `Cmd+Shift+D`) или просто нажмите **`F5`**:
+- **🐍 Python: Server + Web Panel (Port 3000)** — запускает `server.py` и открывает панель по адресу `http://localhost:3000`.
+- **🤖 Python: Standalone Telegram Bot (bot.py)** — запускает только консольного Telegram-бота для группы.
+- **⚡ Node: npm run dev** — альтернативный запуск через npm.
+
+Либо запустите вручную в терминале:
+```bash
+python server.py
+```
+И откройте в браузере: `http://localhost:3000`
+
+---
+
+## Вариант 3. Запуск на собственном сервере (VPS / VDS / Ubuntu / Debian)
 
 ### 1. Требования
 - Python 3.10 или выше (`python3 --version`)

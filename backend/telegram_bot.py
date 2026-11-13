@@ -211,12 +211,19 @@ class TelegramService:
         self.restrict_member_sync(chat_id, user_id, until_date_unix)
 
     def ban_member_sync(self, user_id: Any, specific_chat_id: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Настоящий бан: исключает (удаляет) пользователя из чата Telegram и блокирует возможность повторного входа.
+        """
         if not self.token or not str(user_id).isdigit():
             return {"success": True, "chats": []}
         chat_ids = [specific_chat_id] if specific_chat_id else list(self.known_chat_ids)
         affected = []
         for c_id in chat_ids:
-            res = http_request(f"https://api.telegram.org/bot{self.token}/banChatMember", {"chat_id": c_id, "user_id": int(user_id)}, timeout=8)
+            res = http_request(
+                f"https://api.telegram.org/bot{self.token}/banChatMember",
+                {"chat_id": c_id, "user_id": int(user_id)},
+                timeout=8,
+            )
             if res.get("ok"):
                 affected.append(c_id)
         return {"success": len(affected) > 0, "chats": affected}
@@ -225,16 +232,42 @@ class TelegramService:
         return self.ban_member_sync(user_id, specific_chat_id)
 
     def unban_member_sync(self, user_id: Any, specific_chat_id: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Снимает ограничения с пользователя, возвращая возможность отправлять сообщения,
+        и восстанавливает статус в Telegram, если ранее был заблокирован/кикнут.
+        """
         if not self.token or not str(user_id).isdigit():
             return {"success": True, "chats": []}
         chat_ids = [specific_chat_id] if specific_chat_id else list(self.known_chat_ids)
         affected = []
         for c_id in chat_ids:
-            res = http_request(
+            # Снимаем статус кика, если ранее пользователь был исключён
+            http_request(
                 f"https://api.telegram.org/bot{self.token}/unbanChatMember",
-                {"chat_id": c_id, "user_id": int(user_id), "only_if_banned": False},
+                {"chat_id": c_id, "user_id": int(user_id), "only_if_banned": True},
                 timeout=8,
             )
+            # Возвращаем полные права на отправку сообщений
+            payload = {
+                "chat_id": c_id,
+                "user_id": int(user_id),
+                "permissions": {
+                    "can_send_messages": True,
+                    "can_send_audios": True,
+                    "can_send_documents": True,
+                    "can_send_photos": True,
+                    "can_send_videos": True,
+                    "can_send_video_notes": True,
+                    "can_send_voice_notes": True,
+                    "can_send_polls": True,
+                    "can_send_other_messages": True,
+                    "can_add_web_page_previews": True,
+                    "can_change_info": False,
+                    "can_invite_users": True,
+                    "can_pin_messages": False,
+                },
+            }
+            res = http_request(f"https://api.telegram.org/bot{self.token}/restrictChatMember", payload, timeout=8)
             if res.get("ok"):
                 affected.append(c_id)
         return {"success": len(affected) > 0, "chats": affected}
@@ -388,7 +421,7 @@ class TelegramService:
                 display_name = f"@{target_username.lstrip('@')}" if target_username else target_user_id
                 self.send_message_sync(
                     chat_id,
-                    f"✅ <b>Пользователь {display_name} успешно разблокирован!</b>\nВсе ограничения и мут сняты, карма сброшена до 0.",
+                    f"✅ <b>Пользователю {display_name} возвращена возможность отправлять сообщения!</b>\nВсе ограничения сняты, карма сброшена до 0.",
                     message_id,
                 )
                 return
@@ -432,12 +465,12 @@ class TelegramService:
         if settings.get("autoDeleteProfanity") and mod_result.get("profanityDetected"):
             self.delete_message_sync(chat_id, message_id)
 
-        # Auto-banned
+        # Auto-banned: kick and ban from chat
         if result.get("autoAction") == "banned":
             self.ban_member_sync(user_id, chat_id)
             self.send_message_sync(
                 chat_id,
-                f"🚫 <b>Пользователь @{username} навсегда заблокирован в чате.</b>\nПричина: Кумулятивный рейтинг упал до критической отметки ({result['user'].get('rating')}).",
+                f"🚫 <b>Пользователь @{username} исключён и заблокирован в чате (Бан).</b>\nПричина: Кумулятивный рейтинг упал до критической отметки ({result['user'].get('rating')}).",
             )
         elif result.get("autoAction") == "muted":
             until_unix = int(time.time()) + settings.get("muteDurationMinutes", 120) * 60

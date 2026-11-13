@@ -15,7 +15,7 @@ interface TelegramChatSimulatorProps {
   }) => Promise<void>;
   onClearChat: () => Promise<void>;
   onSelectUser: (user: UserRecord) => void;
-  onAction?: (userId: string, action: 'mute' | 'unmute' | 'ban' | 'reset_rating', durationMinutes?: number, newRating?: number) => Promise<void>;
+  onAction?: (userId: string, action: 'mute' | 'unmute' | 'ban' | 'unban' | 'reset_rating', durationMinutes?: number, newRating?: number) => Promise<void>;
   isLoading: boolean;
   onRefresh?: () => void;
   telegramBotName?: string;
@@ -28,13 +28,6 @@ const PRESET_PERSONAS = [
     fullName: 'Вы (Участник)',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
     description: 'Обычный участник',
-  },
-  {
-    id: 'user_103',
-    username: 'dmitry_chaos',
-    fullName: 'Дмитрий (Тролль)',
-    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
-    description: 'Нарушитель и провокатор',
   },
   {
     id: 'user_101',
@@ -398,7 +391,7 @@ export function TelegramChatSimulator({
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>
-                  <strong>@{selectedPersona.username}</strong> сейчас в статусе: <b>{userRec.status === 'muted' ? 'Временный мут' : 'Бан'}</b>. Его сообщения будут отклоняться ботом.
+                  <strong>@{selectedPersona.username}</strong> сейчас в статусе: <b>{userRec.status === 'muted' ? 'Временный мут' : 'Только чтение (Бан)'}</b>. Отправка сообщений запрещена.
                 </span>
               </div>
               {onAction && (
@@ -407,7 +400,7 @@ export function TelegramChatSimulator({
                   onClick={() => onAction(selectedPersona.id, 'unmute')}
                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-[11px] whitespace-nowrap shadow-2xs transition-colors"
                 >
-                  Снять блокировку (Разблокировать)
+                  Разрешить писать (Снять бан)
                 </button>
               )}
             </div>

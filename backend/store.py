@@ -24,6 +24,7 @@ class ChatModerationStore:
             "banThreshold": -25,
             "muteDurationMinutes": 120,
             "autoDeleteProfanity": True,
+            "commentProfanityMessages": True,
             "showRatingBadgeUnderAll": False,
             "commentNeutralMessages": False,
             "realTelegramConnected": False,
@@ -210,41 +211,7 @@ class ChatModerationStore:
         now = int(time.time() * 1000)
 
         initial_users = [
-            {
-                "id": "user_101",
-                "username": "alex_tech",
-                "fullName": "Алексей Смирнов",
-                "avatarUrl": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
-                "rating": 18,
-                "totalMessages": 24,
-                "toxicMessages": 0,
-                "profanityMessages": 0,
-                "positiveMessages": 19,
-                "status": "active",
-                "lastActivity": now - 1000 * 60 * 15,
-                "riskLevel": "low",
-                "history": [
-                    {
-                        "id": "h1",
-                        "text": "Привет всем! Если кому-то нужна помощь с настройкой вебхуков — пишите, подготовил инструкцию.",
-                        "timestamp": now - 1000 * 60 * 60 * 3,
-                        "score": 4,
-                        "sentiment": "constructive",
-                        "profanity": False,
-                        "actionTaken": "allow",
-                    },
-                    {
-                        "id": "h2",
-                        "text": "Отличная идея, поддерживаю! Добавил ссылку на документацию в закреп.",
-                        "timestamp": now - 1000 * 60 * 30,
-                        "score": 3,
-                        "sentiment": "positive",
-                        "profanity": False,
-                        "actionTaken": "allow",
-                    },
-                ],
-            },
-            {
+            {            
                 "id": "user_102",
                 "username": "anna_dev",
                 "fullName": "Анна Кузнецова",
@@ -268,42 +235,7 @@ class ChatModerationStore:
                         "actionTaken": "allow",
                     },
                 ],
-            },
-            {
-                "id": "user_103",
-                "username": "dmitry_chaos",
-                "fullName": "Дмитрий Тролль",
-                "avatarUrl": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80",
-                "rating": -14,
-                "totalMessages": 9,
-                "toxicMessages": 6,
-                "profanityMessages": 3,
-                "positiveMessages": 0,
-                "status": "muted",
-                "mutedUntil": now + 1000 * 60 * 95,
-                "lastActivity": now - 1000 * 60 * 25,
-                "riskLevel": "critical",
-                "history": [
-                    {
-                        "id": "h4",
-                        "text": "Вы все тут тупые и ничего не понимаете, идите на*** отсюда",
-                        "timestamp": now - 1000 * 60 * 180,
-                        "score": -5,
-                        "sentiment": "aggressive",
-                        "profanity": True,
-                        "actionTaken": "delete",
-                    },
-                    {
-                        "id": "h5",
-                        "text": "Админ криворукий даун, удали свой чат",
-                        "timestamp": now - 1000 * 60 * 25,
-                        "score": -5,
-                        "sentiment": "aggressive",
-                        "profanity": True,
-                        "actionTaken": "mute_temp",
-                    },
-                ],
-            },
+            },            
             {
                 "id": "user_104",
                 "username": "ivan_coder",
@@ -335,31 +267,7 @@ class ChatModerationStore:
             self.users[u["id"]] = u
             self._persist_user(u)
 
-        initial_messages = [
-            {
-                "id": "msg_1",
-                "userId": "user_101",
-                "user": {
-                    "id": "user_101",
-                    "username": "alex_tech",
-                    "fullName": "Алексей Смирнов",
-                    "rating": 14,
-                    "status": "active",
-                    "avatarUrl": initial_users[0]["avatarUrl"],
-                },
-                "text": "Привет всем! Если кому-то нужна помощь с настройкой вебхуков — пишите, подготовил инструкцию.",
-                "timestamp": now - 1000 * 60 * 40,
-                "moderation": {
-                    "score": 4,
-                    "sentiment": "constructive",
-                    "profanityDetected": False,
-                    "profanityWords": [],
-                    "toxicityScore": 0.0,
-                    "categories": ["Взаимопомощь", "Конструктив"],
-                    "explanation": "Предложение бескорыстной помощи участникам чата и полезный материал.",
-                    "action": "allow",
-                },
-            },
+        initial_messages = [            
             {
                 "id": "msg_2",
                 "userId": "user_102",
@@ -369,7 +277,7 @@ class ChatModerationStore:
                     "fullName": "Анна Кузнецова",
                     "rating": 12,
                     "status": "active",
-                    "avatarUrl": initial_users[1]["avatarUrl"],
+                    "avatarUrl": initial_users[0]["avatarUrl"],
                 },
                 "text": "Спасибо огромное за фикс, всё заработало с первого раза! 👍",
                 "timestamp": now - 1000 * 60 * 30,
@@ -383,34 +291,7 @@ class ChatModerationStore:
                     "explanation": "Искренняя благодарность и позитивный тон.",
                     "action": "allow",
                 },
-            },
-            {
-                "id": "msg_3",
-                "userId": "user_103",
-                "user": {
-                    "id": "user_103",
-                    "username": "dmitry_chaos",
-                    "fullName": "Дмитрий Тролль",
-                    "rating": -9,
-                    "status": "active",
-                    "avatarUrl": initial_users[2]["avatarUrl"],
-                },
-                "text": "Админ криворукий даун, удали свой чат и не позорься",
-                "timestamp": now - 1000 * 60 * 25,
-                "isDeleted": True,
-                "moderation": {
-                    "score": -5,
-                    "sentiment": "aggressive",
-                    "profanityDetected": False,
-                    "profanityWords": ["даун"],
-                    "toxicityScore": 0.95,
-                    "categories": ["Оскорбление", "Агрессия", "Троллинг"],
-                    "explanation": "Прямое грубое оскорбление администрации. Токсичность 95%.",
-                    "action": "mute_temp",
-                    "muteDurationMinutes": 120,
-                },
-                "botReply": "🔇 Пользователь @dmitry_chaos временно заблокирован на 2 ч. Причина: Накоплен критический отрицательный рейтинг (-14). Оценка сообщения: [-5/5]",
-            },
+            },            
             {
                 "id": "msg_4",
                 "userId": "user_104",
@@ -420,7 +301,7 @@ class ChatModerationStore:
                     "fullName": "Иван Петров",
                     "rating": 3,
                     "status": "active",
-                    "avatarUrl": initial_users[3]["avatarUrl"],
+                    "avatarUrl": initial_users[1]["avatarUrl"],
                 },
                 "text": "Подскажите пожалуйста, в какой вкладке настраивается вебхук модератора?",
                 "timestamp": now - 1000 * 60 * 10,
@@ -579,35 +460,46 @@ class ChatModerationStore:
                 user["rating"] = 0
             self.recalc_risk_level(user)
 
-        # Check currently muted
-        if user.get("status") == "muted" and user.get("mutedUntil") and now < user["mutedUntil"]:
-            remaining_mins = max(1, int((user["mutedUntil"] - now) / 60000))
-            blocked_msg = {
-                "id": f"msg_{now}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=4))}",
-                "userId": str(user_id),
-                "user": {
-                    "id": user["id"],
-                    "username": user["username"],
-                    "fullName": user["fullName"],
-                    "rating": user["rating"],
-                    "status": user["status"],
-                    "avatarUrl": user.get("avatarUrl"),
-                },
-                "text": text,
-                "timestamp": now,
-                "isDeleted": True,
-                "moderation": {
-                    **moderation,
-                    "action": "delete",
-                    "explanation": f"Сообщение отклонено: пользователь находится во временном муте (осталось {remaining_mins} мин).",
-                },
-                "botReply": f"🔇 @{user['username']}, вы временно заблокированы в чате. До снятия ограничений: {remaining_mins} мин.",
-            }
-            self.messages.append(blocked_msg)
-            self._persist_message(blocked_msg)
-            return {"message": blocked_msg, "user": user, "autoAction": "blocked_muted"}
+        # Check currently muted (temporary or permanent)
+        if user.get("status") == "muted":
+            if user.get("mutedUntil") and now < user["mutedUntil"]:
+                remaining_mins = max(1, int((user["mutedUntil"] - now) / 60000))
+                explanation = f"Сообщение отклонено: пользователь находится во временном муте (осталось {remaining_mins} мин)."
+                bot_reply = f"🔇 @{user['username']}, вы временно заблокированы в чате. До снятия ограничений: {remaining_mins} мин."
+            elif not user.get("mutedUntil"):
+                explanation = "Сообщение отклонено: пользователю установлен постоянный мут (режим «Только чтение»)."
+                bot_reply = f"🔇 @{user['username']}, вам бессрочно запрещено писать сообщения в чате (режим «Только чтение»)."
+            else:
+                explanation = None
+                bot_reply = None
 
-        # Check currently banned
+            if explanation:
+                blocked_msg = {
+                    "id": f"msg_{now}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=4))}",
+                    "userId": str(user_id),
+                    "user": {
+                        "id": user["id"],
+                        "username": user["username"],
+                        "fullName": user["fullName"],
+                        "rating": user["rating"],
+                        "status": user["status"],
+                        "avatarUrl": user.get("avatarUrl"),
+                    },
+                    "text": text,
+                    "timestamp": now,
+                    "isDeleted": True,
+                    "moderation": {
+                        **moderation,
+                        "action": "delete",
+                        "explanation": explanation,
+                    },
+                    "botReply": bot_reply,
+                }
+                self.messages.append(blocked_msg)
+                self._persist_message(blocked_msg)
+                return {"message": blocked_msg, "user": user, "autoAction": "blocked_muted"}
+
+        # Check currently banned (excluded from chat)
         if user.get("status") == "banned":
             blocked_msg = {
                 "id": f"msg_{now}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=4))}",
@@ -626,9 +518,9 @@ class ChatModerationStore:
                 "moderation": {
                     **moderation,
                     "action": "ban",
-                    "explanation": "Пользователь навсегда заблокирован за критические нарушения.",
+                    "explanation": "Сообщение отклонено: пользователь заблокирован и исключён из чата (Бан).",
                 },
-                "botReply": f"🚫 @{user['username']} заблокирован навсегда за систематические грубые нарушения.",
+                "botReply": f"🚫 @{user['username']} заблокирован и исключён из группы за систематические нарушения.",
             }
             self.messages.append(blocked_msg)
             self._persist_message(blocked_msg)
@@ -665,14 +557,11 @@ class ChatModerationStore:
         bot_reply = None
         should_delete = False
 
-        if self.settings["autoDeleteProfanity"] and moderation.get("profanityDetected"):
-            should_delete = True
-
         if user["rating"] <= ban_th:
             user["status"] = "banned"
             auto_action = "banned"
             should_delete = True
-            bot_reply = f"🚫 Пользователь @{user['username']} навсегда заблокирован в чате. Кумулятивный рейтинг упал до критической отметки ({user['rating']} ≤ {ban_th})."
+            bot_reply = f"🚫 Пользователь @{user['username']} исключён и заблокирован в чате (Бан). Кумулятивный рейтинг упал до критической отметки ({user['rating']} ≤ {ban_th})."
         elif user["rating"] <= mute_th:
             user["status"] = "muted"
             duration_ms = self.settings["muteDurationMinutes"] * 60 * 1000
@@ -684,6 +573,11 @@ class ChatModerationStore:
         elif score <= -3:
             user["status"] = "warned"
             bot_reply = f"⚠️ Предупреждение @{user['username']}: оценка сообщения [{score}/5]. Причина: {moderation.get('explanation', '')}. Текущий рейтинг: {user['rating']}. При достижении {mute_th} включится авто-мут."
+
+        if self.settings.get("autoDeleteProfanity") and moderation.get("profanityDetected"):
+            should_delete = True
+            if self.settings.get("commentProfanityMessages", True):
+                bot_reply = f"⚠️ Сообщение удалено: использование ненормативной лексики в чате запрещено."
 
         self.recalc_risk_level(user)
         self._persist_user(user)
@@ -739,8 +633,11 @@ class ChatModerationStore:
         now = int(time.time() * 1000)
 
         if status == "muted":
-            mins = duration_minutes or self.settings["muteDurationMinutes"]
-            user["mutedUntil"] = now + mins * 60 * 1000
+            if duration_minutes == 0:
+                user["mutedUntil"] = None
+            else:
+                mins = duration_minutes if (duration_minutes is not None and duration_minutes > 0) else self.settings["muteDurationMinutes"]
+                user["mutedUntil"] = now + mins * 60 * 1000
         elif status == "active":
             user.pop("mutedUntil", None)
             if reset_rating_if_negative and (user.get("rating", 0) <= self.settings["muteThreshold"] or user.get("rating", 0) < 0):
