@@ -2,7 +2,10 @@ node_modules/
 build/
 dist/
 coverage/
+.venv/
+.vscode/
 .DS_Store
 *.log
+*.db
 .env*
 !.env.example
