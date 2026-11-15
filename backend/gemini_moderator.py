@@ -172,7 +172,7 @@ def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] =
 
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -185,7 +185,7 @@ def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] =
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"responseMimeType": "application/json"}
             }).encode("utf-8")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
             req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=4) as resp:
                 res_json = json.loads(resp.read().decode("utf-8"))
