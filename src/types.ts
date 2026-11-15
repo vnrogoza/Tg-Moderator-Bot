@@ -66,7 +66,7 @@ export interface BotSettings {
   muteDurationMinutes: number; // e.g. 60 min (1 hour)
   autoDeleteProfanity: boolean;
   commentProfanityMessages: boolean;
-  showRatingBadgeUnderAll: boolean;
+  commentToxicMessages: boolean;
   commentNeutralMessages: boolean; // false by default: neutral messages are never commented on
   realTelegramConnected: boolean;
   telegramBotUsername?: string;

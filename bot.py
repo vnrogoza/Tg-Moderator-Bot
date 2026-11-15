@@ -210,7 +210,7 @@ def moderate_incoming_message(message: types.Message):
         )
     elif outcome.get("message", {}).get("botReply"):
         bot.reply_to(message, outcome["message"]["botReply"])
-    elif settings.get("showRatingBadgeUnderAll") or score <= -2:
+    elif score <= -2:
         emoji = "🌟" if score >= 3 else "👍" if score > 0 else "💬" if score == 0 else "⚠️" if score >= -2 else "🚨"
         badge = f"{emoji} <b>[{sign}{score}/5]</b> {mod.get('explanation')} | Карма: {outcome['user']['rating']}"
         bot.reply_to(message, badge)

@@ -17,7 +17,7 @@ export default function App() {
     banThreshold: -25,
     muteDurationMinutes: 120,
     autoDeleteProfanity: true,
-    showRatingBadgeUnderAll: false,
+    commentProfanityMessages: true,
     commentNeutralMessages: false,
     realTelegramConnected: false,
     telegramBotUsername: 'ModAIBot',
@@ -245,7 +245,7 @@ export default function App() {
                 </span>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                   <Sparkles className="w-3 h-3" />
-                  Gemini 3.8
+                  Gemini 2.5
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden sm:block">

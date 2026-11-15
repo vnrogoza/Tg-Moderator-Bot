@@ -484,7 +484,7 @@ class TelegramService:
         elif is_neutral:
             if settings.get("commentNeutralMessages"):
                 self.send_message_sync(chat_id, score_badge, message_id)
-        elif settings.get("showRatingBadgeUnderAll") or score <= -2:
+        elif score <= -2:
             self.send_message_sync(chat_id, score_badge, message_id)
 
     async def handle_webhook_update(self, update: Dict[str, Any]):

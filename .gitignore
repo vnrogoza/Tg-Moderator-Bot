@@ -10,3 +10,5 @@ backend/__pycache__
 *.db
 .env*
 !.env.example
+info.txt
+package-lock.json

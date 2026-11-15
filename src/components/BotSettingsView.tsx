@@ -265,6 +265,21 @@ export function BotSettingsView({ settings, onUpdateSettings, onTestPhrase }: Bo
                 <label className="flex items-start gap-2.5 text-xs text-slate-800 cursor-pointer">
                   <input
                     type="checkbox"
+                    checked={formData.commentToxicMessages ?? true}
+                    onChange={(e) => setFormData({ ...formData, commentToxicMessages: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 accent-indigo-600"
+                  />
+                  <div>
+                    <span className="font-medium">Комментировать токсичные сообщения</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      При обнаружении токсичности бот выводит предупреждающий баннер-комментарий, сообщение не удаляется.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 text-xs text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
                     checked={formData.commentNeutralMessages ?? false}
                     onChange={(e) => setFormData({ ...formData, commentNeutralMessages: e.target.checked })}
                     className="w-4 h-4 mt-0.5 rounded text-indigo-600 accent-indigo-600"
@@ -273,21 +288,6 @@ export function BotSettingsView({ settings, onUpdateSettings, onTestPhrase }: Bo
                     <span className="font-medium">Комментировать нейтральные сообщения</span>
                     <span className="block text-[11px] text-slate-500 font-normal">
                       По умолчанию отключено: бот не пишет комментарии и не спамит в чат на обычные диалоги.
-                    </span>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-2.5 text-xs text-slate-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.showRatingBadgeUnderAll}
-                    onChange={(e) => setFormData({ ...formData, showRatingBadgeUnderAll: e.target.checked })}
-                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 accent-indigo-600"
-                  />
-                  <div>
-                    <span className="font-medium">Показывать плашку оценки кармы при нарушениях</span>
-                    <span className="block text-[11px] text-slate-500 font-normal">
-                      Отправлять плашку с оценкой (-5..+5) и причиной при отклонениях от правил чата.
                     </span>
                   </div>
                 </label>

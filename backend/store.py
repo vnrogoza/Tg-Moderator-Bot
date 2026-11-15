@@ -25,7 +25,7 @@ class ChatModerationStore:
             "muteDurationMinutes": 120,
             "autoDeleteProfanity": True,
             "commentProfanityMessages": True,
-            "showRatingBadgeUnderAll": False,
+            "commentToxicMessages": True,
             "commentNeutralMessages": False,
             "realTelegramConnected": False,
             "telegramBotUsername": "ModAIBot",
@@ -578,6 +578,14 @@ class ChatModerationStore:
             should_delete = True
             if self.settings.get("commentProfanityMessages", True):
                 bot_reply = f"⚠️ Сообщение удалено: использование ненормативной лексики в чате запрещено."
+        elif self.settings.get("commentToxicMessages", True) and not bot_reply and not should_delete:
+            is_toxic = (
+                score < 0
+                or moderation.get("sentiment") in ("negative", "aggressive")
+                or moderation.get("toxicityScore", 0) > 0.3
+            )
+            if is_toxic:
+                bot_reply = f"⚠️ Предупреждение: обнаружена токсичность в сообщении. Пожалуйста, соблюдайте правила вежливого общения."
 
         self.recalc_risk_level(user)
         self._persist_user(user)

@@ -172,7 +172,7 @@ def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] =
 
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
