@@ -13,7 +13,7 @@ except ImportError:
     pass
 
 from backend.store import store
-from backend.gemini_moderator import analyze_message_with_gemini
+from backend.gemini_moderator import analyze_message_with_ai
 
 logger = logging.getLogger("telegram_bot")
 
@@ -434,7 +434,7 @@ class TelegramService:
             else None
         )
 
-        mod_result = analyze_message_with_gemini(text, user_summary)
+        mod_result = analyze_message_with_ai(text, user_summary)
         result = store.process_incoming_message(
             user_id=user_id,
             username=username,

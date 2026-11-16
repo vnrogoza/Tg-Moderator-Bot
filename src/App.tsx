@@ -18,9 +18,12 @@ export default function App() {
     muteDurationMinutes: 120,
     autoDeleteProfanity: true,
     commentProfanityMessages: true,
+    commentToxicMessages: true,
     commentNeutralMessages: false,
     realTelegramConnected: false,
     telegramBotUsername: 'ModAIBot',
+    aiProvider: 'google',
+    aiModelName: 'gemini-2.5-flash',
   });
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [isLoading, setIsLoading] = useState(false);

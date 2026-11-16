@@ -70,6 +70,8 @@ export interface BotSettings {
   commentNeutralMessages: boolean; // false by default: neutral messages are never commented on
   realTelegramConnected: boolean;
   telegramBotUsername?: string;
+  aiProvider: 'google' | 'yandex';
+  aiModelName: string;
 }
 
 export interface ModerationStats {

@@ -17,7 +17,7 @@ except ImportError:
     pass
 
 from backend.store import store
-from backend.gemini_moderator import analyze_message_with_gemini
+from backend.gemini_moderator import analyze_message_with_ai
 
 logging.basicConfig(
     level=logging.INFO,
@@ -157,7 +157,7 @@ def moderate_incoming_message(message: types.Message):
     summary = f"Рейтинг: {u.get('rating')}, нарушений: {u.get('toxicMessages')}" if u else None
 
     logger.info(f"🔍 Проверка сообщения от @{username}: '{text}'")
-    mod = analyze_message_with_gemini(text, summary)
+    mod = analyze_message_with_ai(text, summary)
 
     outcome = store.process_incoming_message(
         user_id=user_id,

@@ -29,6 +29,8 @@ class ChatModerationStore:
             "commentNeutralMessages": False,
             "realTelegramConnected": False,
             "telegramBotUsername": "ModAIBot",
+            "aiProvider": "google",
+            "aiModelName": "gemini-2.5-flash",
         }
         self._init_db()
         self._load_from_db()

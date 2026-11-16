@@ -121,18 +121,22 @@ def fallback_rule_analysis(text: str) -> Dict[str, Any]:
     }
 
 
-def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] = None) -> Dict[str, Any]:
+def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = None) -> Dict[str, Any]:
     fallback = fallback_rule_analysis(text)
 
     # Fast-path: If blatant profanity or extreme aggression is detected locally,
-    # penalize immediately without spending Gemini API quota
+    # penalize immediately without spending API quota
     if fallback.get("profanityDetected") and fallback.get("score", 0) <= -4:
         return fallback
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    try:
+        from backend.store import store
+        settings = store.get_settings()
+    except Exception:
+        settings = {}
 
-    if not api_key:
-        return fallback
+    ai_provider = settings.get("aiProvider", "google")
+    ai_model = settings.get("aiModelName", "yandexgpt-5.1" if ai_provider == "yandex" else "gemini-2.5-flash")
 
     safe_text = text.replace('"', '\\"')
     user_context = f"Контекст пользователя: {user_history_summary}\n" if user_history_summary else ""
@@ -166,34 +170,79 @@ def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] =
 
     try:
         raw_text = ""
-        try:
-            from google import genai
-            from google.genai import types
-
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                ),
-            )
-            raw_text = response.text.strip() if response and response.text else ""
-        except ImportError:
-            import urllib.request
+        if ai_provider == "yandex":
+            yandex_api_key = os.getenv("YANDEX_API_KEY") or os.getenv("YANDEX_TOKEN")
+            folder_id = os.getenv("YANDEX_FOLDER_ID", "b1g_default_folder")
+            url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+            headers = {
+                "Content-Type": "application/json",
+            }
+            if yandex_api_key:
+                headers["Authorization"] = f"Api-Key {yandex_api_key}"
+            
             req_data = json.dumps({
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"responseMimeType": "application/json"}
+                "modelUri": f"gpt://{folder_id}/{ai_model}/latest",
+                "completionOptions": {
+                    "stream": False,
+                    "temperature": 0.2,
+                    "maxTokens": 1000
+                },
+                "messages": [
+                    {
+                        "role": "system",
+                        "text": "Ты строгий робот-модератор. Отвечай строго в формате JSON."
+                    },
+                    {
+                        "role": "user",
+                        "text": prompt
+                    }
+                ]
             }).encode("utf-8")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
-            req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
-                candidates = res_json.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts:
-                        raw_text = parts[0].get("text", "").strip()
+
+            import urllib.request
+            req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    alternatives = res_json.get("result", {}).get("alternatives", [])
+                    if alternatives:
+                        raw_text = alternatives[0].get("message", {}).get("text", "").strip()
+            except Exception as ye:
+                logger.warning(f"YandexGPT API request failed (falling back to rule-based): {ye}")
+                return fallback
+        else:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                return fallback
+
+            try:
+                from google import genai
+                from google.genai import types
+
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=ai_model if ai_model else "gemini-2.5-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
+                )
+                raw_text = response.text.strip() if response and response.text else ""
+            except ImportError:
+                import urllib.request
+                req_data = json.dumps({
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"responseMimeType": "application/json"}
+                }).encode("utf-8")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{ai_model if ai_model else 'gemini-2.5-flash'}:generateContent?key={api_key}"
+                req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    candidates = res_json.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            raw_text = parts[0].get("text", "").strip()
 
         if not raw_text:
             return fallback
@@ -252,5 +301,5 @@ def analyze_message_with_gemini(text: str, user_history_summary: Optional[str] =
             "muteDurationMinutes": 60 if score <= -4 else None,
         }
     except Exception as e:
-        logger.warning(f"Gemini API call failed, using rule-based fallback: {e}")
+        logger.warning(f"AI API call failed, using rule-based fallback: {e}")
         return fallback

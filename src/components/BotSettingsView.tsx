@@ -233,6 +233,40 @@ export function BotSettingsView({ settings, onUpdateSettings, onTestPhrase }: Bo
               </p>
             </div>
 
+            {/* AI Provider & Model Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Провайдер ИИ:</label>
+              <select
+                value={formData.aiProvider || 'google'}
+                onChange={(e) => {
+                  const provider = e.target.value as 'google' | 'yandex';
+                  const defaultModel = provider === 'yandex' ? 'yandexgpt-5.1' : 'gemini-2.5-flash';
+                  setFormData({ ...formData, aiProvider: provider, aiModelName: formData.aiModelName || defaultModel });
+                }}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
+              >
+                <option value="google">Google (Gemini AI)</option>
+                <option value="yandex">Yandex (YandexGPT / alice.yandex.ru)</option>
+              </select>
+              <p className="text-[11px] text-slate-500">
+                Выберите языковую модель для анализа сообщений (Google по умолчанию).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Название модели:</label>
+              <input
+                type="text"
+                value={formData.aiModelName || (formData.aiProvider === 'yandex' ? 'yandexgpt-5.1' : 'gemini-2.5-flash')}
+                onChange={(e) => setFormData({ ...formData, aiModelName: e.target.value })}
+                placeholder={formData.aiProvider === 'yandex' ? 'yandexgpt-5.1' : 'gemini-2.5-flash'}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
+              />
+              <p className="text-[11px] text-slate-500">
+                Имя модели ИИ (например, gemini-2.5-flash или yandexgpt-5.1).
+              </p>
+            </div>
+
             {/* Auto-delete profanity switch */}
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-700">Автоматические действия:</span>

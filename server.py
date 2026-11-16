@@ -37,7 +37,7 @@ if env_path.is_file():
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 from backend.store import store
-from backend.gemini_moderator import analyze_message_with_gemini
+from backend.gemini_moderator import analyze_message_with_ai
 from backend.telegram_bot import telegram_service
 
 
@@ -149,7 +149,7 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
             if not text:
                 self.send_json({"error": "Параметр 'text' обязателен."}, status=400)
                 return
-            result = analyze_message_with_gemini(text, body.get("userSummary"))
+            result = analyze_message_with_ai(text, body.get("userSummary"))
             self.send_json(result)
             return
 
@@ -170,7 +170,7 @@ class ModeratorRequestHandler(BaseHTTPRequestHandler):
                 else None
             )
 
-            mod = analyze_message_with_gemini(text, user_summary)
+            mod = analyze_message_with_ai(text, user_summary)
             outcome = store.process_incoming_message(
                 user_id=uid,
                 username=uname,
@@ -336,7 +336,7 @@ def _init_telegram_bg():
         print(f"Warning initializing Telegram bot: {e}", flush=True)
 
 
-def run_python_server(host="0.0.0.0", port=3000):
+def run_python_server(host="127.0.0.1", port=3000):
     server_address = (host, port)
     httpd = ThreadedHTTPServer(server_address, ModeratorRequestHandler)
     print(f"🚀 Telegram Chat Moderator Server (Pure Python) running on http://{host}:{port}", flush=True)
@@ -359,7 +359,7 @@ def run_python_server(host="0.0.0.0", port=3000):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Telegram Chat Moderator Server (Python)")
     parser.add_argument("--port", type=int, default=int(os.getenv("PORT", 3000)), help="Port to listen on")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host address")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host address")
     args, _ = parser.parse_known_args()
 
     run_python_server(host=args.host, port=args.port)
