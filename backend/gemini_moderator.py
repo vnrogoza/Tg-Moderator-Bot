@@ -9,7 +9,26 @@ try:
 except ImportError:
     pass
 
+import datetime
+from pathlib import Path
+
 logger = logging.getLogger("gemini_moderator")
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+AI_LOG_PATH = ROOT_DIR / "ai_requests.log"
+
+def log_ai_request(provider: str, model: str, url: str, payload: Any, response_text: str, error: Optional[str] = None):
+    enabled = os.getenv("AI_API_LOGGING", "false").lower() in ("true", "1", "yes")
+    if not enabled:
+        return
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        payload_str = json.dumps(payload, ensure_ascii=False) if isinstance(payload, (dict, list)) else str(payload)
+        line = f"[{timestamp}] PROVIDER: {provider} | MODEL: {model} | URL: {url}\nREQUEST: {payload_str}\nRESPONSE: {response_text or error}\n{'-'*60}\n"
+        with open(AI_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception as e:
+        logger.warning(f"Failed to write AI API log: {e}")
 
 # Common Russian profanity roots and patterns for ultra-fast local checking and fallback
 RUSSIAN_PROFANITY_PATTERNS = [
@@ -180,7 +199,7 @@ def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = Non
             if yandex_api_key:
                 headers["Authorization"] = f"Api-Key {yandex_api_key}"
             
-            req_data = json.dumps({
+            payload_dict = {
                 "modelUri": f"gpt://{folder_id}/{ai_model}/latest",
                 "completionOptions": {
                     "stream": False,
@@ -197,7 +216,8 @@ def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = Non
                         "text": prompt
                     }
                 ]
-            }).encode("utf-8")
+            }
+            req_data = json.dumps(payload_dict).encode("utf-8")
 
             import urllib.request
             req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
@@ -207,7 +227,9 @@ def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = Non
                     alternatives = res_json.get("result", {}).get("alternatives", [])
                     if alternatives:
                         raw_text = alternatives[0].get("message", {}).get("text", "").strip()
+                log_ai_request("yandex", ai_model, url, payload_dict, raw_text)
             except Exception as ye:
+                log_ai_request("yandex", ai_model, url, payload_dict, "", error=str(ye))
                 logger.warning(f"YandexGPT API request failed (falling back to rule-based): {ye}")
                 return fallback
         else:
@@ -228,21 +250,28 @@ def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = Non
                     ),
                 )
                 raw_text = response.text.strip() if response and response.text else ""
+                log_ai_request("google", ai_model or "gemini-2.5-flash", f"google.genai.models.generate_content(model={ai_model})", {"prompt": prompt}, raw_text)
             except ImportError:
                 import urllib.request
-                req_data = json.dumps({
+                payload_dict = {
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"responseMimeType": "application/json"}
-                }).encode("utf-8")
+                }
+                req_data = json.dumps(payload_dict).encode("utf-8")
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{ai_model if ai_model else 'gemini-2.5-flash'}:generateContent?key={api_key}"
                 req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    res_json = json.loads(resp.read().decode("utf-8"))
-                    candidates = res_json.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts:
-                            raw_text = parts[0].get("text", "").strip()
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        res_json = json.loads(resp.read().decode("utf-8"))
+                        candidates = res_json.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts:
+                                raw_text = parts[0].get("text", "").strip()
+                    log_ai_request("google", ai_model or "gemini-2.5-flash", url, payload_dict, raw_text)
+                except Exception as ge:
+                    log_ai_request("google", ai_model or "gemini-2.5-flash", url, payload_dict, "", error=str(ge))
+                    raise ge
 
         if not raw_text:
             return fallback
