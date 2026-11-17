@@ -9,6 +9,7 @@ backend/__pycache__
 *.log
 *.db
 .env*
+.http
 !.env.example
 info.txt
 package-lock.json

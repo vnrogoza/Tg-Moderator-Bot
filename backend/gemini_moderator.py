@@ -190,48 +190,102 @@ def analyze_message_with_ai(text: str, user_history_summary: Optional[str] = Non
     try:
         raw_text = ""
         if ai_provider == "yandex":
-            yandex_api_key = os.getenv("YANDEX_API_KEY") or os.getenv("YANDEX_TOKEN")
-            folder_id = os.getenv("YANDEX_FOLDER_ID", "b1g_default_folder")
-            url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-            headers = {
-                "Content-Type": "application/json",
-            }
-            if yandex_api_key:
-                headers["Authorization"] = f"Api-Key {yandex_api_key}"
-            
-            payload_dict = {
-                "modelUri": f"gpt://{folder_id}/{ai_model}/latest",
-                "completionOptions": {
-                    "stream": False,
-                    "temperature": 0.2,
-                    "maxTokens": 1000
-                },
-                "messages": [
-                    {
-                        "role": "system",
-                        "text": "Ты строгий робот-модератор. Отвечай строго в формате JSON."
-                    },
-                    {
-                        "role": "user",
-                        "text": prompt
-                    }
-                ]
-            }
-            req_data = json.dumps(payload_dict).encode("utf-8")
+            yandex_cloud_folder = os.getenv("YANDEX_FOLDERID") or os.getenv("YANDEX_FOLDER_ID") or "b1g_default_folder"
+            yandex_cloud_api_key = os.getenv("YANDEX_APIKEY") or os.getenv("YANDEX_API_KEY") or os.getenv("YANDEX_TOKEN") or ""
+            yandex_cloud_model = ai_model if ai_model else "aliceai-llm-flash/latest"
 
-            import urllib.request
-            req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    res_json = json.loads(resp.read().decode("utf-8"))
-                    alternatives = res_json.get("result", {}).get("alternatives", [])
-                    if alternatives:
-                        raw_text = alternatives[0].get("message", {}).get("text", "").strip()
-                log_ai_request("yandex", ai_model, url, payload_dict, raw_text)
+                import openai
+                client = openai.OpenAI(
+                    api_key=yandex_cloud_api_key,
+                    base_url="https://ai.api.cloud.yandex.net/v1",
+                    project=yandex_cloud_folder
+                )
+                payload_dict = {
+                    "model": f"gpt://{yandex_cloud_folder}/{yandex_cloud_model}",
+                    "temperature": 0.2,
+                    "instructions": prompt,
+                    "input": safe_text,
+                    "max_output_tokens": 1000,
+                    "store": False,
+                    "truncation": "disabled",
+                }
+                response = client.responses.create(**payload_dict)
+                raw_text = getattr(response, "output_text", None)
+                if not raw_text and hasattr(response, "choices") and response.choices:
+                    raw_text = getattr(response.choices[0].message, "content", "")
+                if not raw_text:
+                    raw_text = str(response)
+
+                log_ai_request("yandex_openai", yandex_cloud_model, "https://ai.api.cloud.yandex.net/v1/responses", payload_dict, raw_text)
             except Exception as ye:
-                log_ai_request("yandex", ai_model, url, payload_dict, "", error=str(ye))
-                logger.warning(f"YandexGPT API request failed (falling back to rule-based): {ye}")
-                return fallback
+                try:
+                    url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+                    headers = {"Content-Type": "application/json"}
+                    if yandex_cloud_api_key:
+                        headers["Authorization"] = f"Api-Key {yandex_cloud_api_key}"
+                    fallback_payload = {
+                        "modelUri": f"gpt://{yandex_cloud_folder}/{yandex_cloud_model}/latest",
+                        "completionOptions": {"stream": False, "temperature": 0.2, "maxTokens": 1000},
+                        "messages": [{"role": "system", "text": "Ты строгий робот-модератор. Отвечай строго в формате JSON."}, {"role": "user", "text": prompt}]
+                    }
+                    req_data = json.dumps(fallback_payload).encode("utf-8")
+                    import urllib.request
+                    req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        res_json = json.loads(resp.read().decode("utf-8"))
+                        alternatives = res_json.get("result", {}).get("alternatives", [])
+                        if alternatives:
+                            raw_text = alternatives[0].get("message", {}).get("text", "").strip()
+                    log_ai_request("yandex_urllib", yandex_cloud_model, url, fallback_payload, raw_text)
+                except Exception as ue:
+                    log_ai_request("yandex", yandex_cloud_model, "https://ai.api.cloud.yandex.net/v1", {"error": str(ye), "urllib_error": str(ue)}, "", error=str(ue))
+                    logger.warning(f"YandexGPT API request failed (openai & urllib fallbacks failed): {ye} / {ue}")
+                    return fallback
+
+            # --- OLD URLLIB IMPLEMENTATION (COMMENTED OUT AS REQUESTED) ---
+            # yandex_api_key = os.getenv("YANDEX_API_KEY") or os.getenv("YANDEX_TOKEN")
+            # folder_id = os.getenv("YANDEX_FOLDER_ID", "b1g_default_folder")
+            # url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+            # headers = {
+            #     "Content-Type": "application/json",
+            # }
+            # if yandex_api_key:
+            #     headers["Authorization"] = f"Api-Key {yandex_api_key}"
+            # 
+            # payload_dict = {
+            #     "modelUri": f"gpt://{folder_id}/{ai_model}/latest",
+            #     "completionOptions": {
+            #         "stream": False,
+            #         "temperature": 0.2,
+            #         "maxTokens": 1000
+            #     },
+            #     "messages": [
+            #         {
+            #             "role": "system",
+            #             "text": "Ты строгий робот-модератор. Отвечай строго в формате JSON."
+            #         },
+            #         {
+            #             "role": "user",
+            #             "text": prompt
+            #         }
+            #     ]
+            # }
+            # req_data = json.dumps(payload_dict).encode("utf-8")
+            #
+            # import urllib.request
+            # req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
+            # try:
+            #     with urllib.request.urlopen(req, timeout=10) as resp:
+            #         res_json = json.loads(resp.read().decode("utf-8"))
+            #         alternatives = res_json.get("result", {}).get("alternatives", [])
+            #         if alternatives:
+            #             raw_text = alternatives[0].get("message", {}).get("text", "").strip()
+            #     log_ai_request("yandex", ai_model, url, payload_dict, raw_text)
+            # except Exception as ye:
+            #     log_ai_request("yandex", ai_model, url, payload_dict, "", error=str(ye))
+            #     logger.warning(f"YandexGPT API request failed (falling back to rule-based): {ye}")
+            #     return fallback
         else:
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
